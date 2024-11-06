@@ -1,0 +1,10 @@
+dkpro_cassis==0.9.1
+fastapi==0.115.4
+ipython==8.12.3
+librosa==0.10.1
+matplotlib
+numpy
+omegaconf==2.3.0
+pydantic==2.9.2
+pydantic_settings==2.6.0
+uvicorn==0.18.2
