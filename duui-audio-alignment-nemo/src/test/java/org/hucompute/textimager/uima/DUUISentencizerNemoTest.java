@@ -3,9 +3,11 @@ package org.hucompute.textimager.uima;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
 import org.apache.commons.io.FileUtils;
 import org.apache.uima.UIMAException;
+import org.apache.uima.cas.CAS;
 import org.apache.uima.fit.factory.JCasFactory;
 import org.apache.uima.fit.util.JCasUtil;
 import org.apache.uima.jcas.JCas;
+import org.apache.uima.util.CasCopier;
 import org.apache.uima.util.XmlCasSerializer;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -101,23 +103,48 @@ public class DUUISentencizerNemoTest {
         composer.addDriver(new DUUIRemoteDriver());
         composer.add(
                 new DUUIRemoteDriver
-                        .Component("http://127.0.0.1:1001")
-                        .withScale(1)
-        );
-        composer.add(
-                new DUUIRemoteDriver
                         .Component("http://127.0.0.1:1000")
                         .withScale(1)
         );
+//        composer.add(
+//                new DUUIRemoteDriver
+//                        .Component("http://127.0.0.1:1001")
+//                        .withScale(1)
+//                        .withParameter("realign_threshold", "2")
+//        );
+
+        var nemo_composer = new DUUIComposer()
+                .withSkipVerification(true)
+                .withLuaContext(new DUUILuaContext().withJsonLibrary());
+        nemo_composer.addDriver(new DUUIRemoteDriver());
+
+        nemo_composer.add(
+                new DUUIRemoteDriver
+                        .Component("http://127.0.0.1:1001")
+                        .withScale(1)
+        );
+
+        var nemo_composer_align = new DUUIComposer()
+                .withSkipVerification(true)
+                .withLuaContext(new DUUILuaContext().withJsonLibrary());
+        nemo_composer_align.addDriver(new DUUIRemoteDriver());
+
+        nemo_composer_align.add(
+                new DUUIRemoteDriver
+                        .Component("http://127.0.0.1:1001")
+                        .withScale(1)
+                        .withParameter("realign_threshold", "0.5")
+        );
+
         cas = JCasFactory.createJCas();
-        cas.setDocumentLanguage("de");
+        cas.setDocumentLanguage("en");
         cas.setDocumentText("Example text");
 
 
-        String base64 = Base64.getEncoder().encodeToString(FileUtils.readFileToByteArray(new File("src/test/resources/output_3.wav")));
+        String base64 = Base64.getEncoder().encodeToString(FileUtils.readFileToByteArray(new File("src/test/resources/IS1009a.wav")));
         
 
-        
+
 
         AudioWav audioWave = new AudioWav(cas);
         audioWave.setBegin(0);
@@ -131,6 +158,12 @@ public class DUUISentencizerNemoTest {
 
         composer.run(cas);
         cas.getViewName();
+        JCas nemo_cas = JCasFactory.createJCas();
+        JCas nemo_cas_align = JCasFactory.createJCas();
+        CasCopier.copyCas(cas.getCas(), nemo_cas.getCas(), true);
+        CasCopier.copyCas(cas.getCas(), nemo_cas_align.getCas(), true);
+        nemo_composer.run(nemo_cas);
+        nemo_composer_align.run(nemo_cas_align);
         JCasUtil.select(cas, DocumentModification.class).forEach(System.out::println);
     }
 

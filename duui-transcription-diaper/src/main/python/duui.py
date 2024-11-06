@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from pydantic_settings import BaseSettings
 
 import os
-
+import shutil
 
 import librosa
 
@@ -243,7 +243,7 @@ def post_process(request: DUUIRequest) -> DUUIResponse:
             models = "10attractors/SC_LibriSpeech_2spk_adapted1-10/models/"
             signal, sample_rate = librosa.load(AUDIO_FILENAME, sr=None)
             # Delete old rttm files
-            os.rmdir(data_dir)
+            shutil.rmtree(data_dir)
 
             os.system(f"python ./diaper/infer_single_file.py -c examples/{model} --wav-dir ./ --wav-name {AUDIO_NAME} --models-path ./models/{models} --rttms-dir {data_dir} --sampling-rate {sample_rate}")
             

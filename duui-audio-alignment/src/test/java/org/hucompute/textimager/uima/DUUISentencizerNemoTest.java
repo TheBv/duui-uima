@@ -100,19 +100,36 @@ public class DUUISentencizerNemoTest {
                 .withLuaContext(new DUUILuaContext().withJsonLibrary());
         composer.addDriver(new DUUIRemoteDriver());
         composer.add(
+            // Whisper
                 new DUUIRemoteDriver
                         .Component("http://127.0.0.1:1000")
                         .withScale(1)
         );
+        composer.add(
+            // DIAPER
+                new DUUIRemoteDriver
+                        .Component("http://127.0.0.1:1002")
+                        .withScale(1)
+        );
+        composer.add(
+            // Alignment
+                new DUUIRemoteDriver
+                        .Component("http://127.0.0.1:1003")
+                        .withScale(1)
+                        .withParameter("use_punct", "true")
+        );
+
+       
+
         cas = JCasFactory.createJCas();
         cas.setDocumentLanguage("en");
         cas.setDocumentText("Example text");
 
 
-        String base64 = Base64.getEncoder().encodeToString(FileUtils.readFileToByteArray(new File("src/test/resources/test.wav")));
+        String base64 = Base64.getEncoder().encodeToString(FileUtils.readFileToByteArray(new File("src/test/resources/IS1009a.wav")));
         
 
-        
+
 
         AudioWav audioWave = new AudioWav(cas);
         audioWave.setBegin(0);
@@ -123,7 +140,6 @@ public class DUUISentencizerNemoTest {
         audioWave.setBitsPerSample(16);
         audioWave.setBase64(base64);
         audioWave.addToIndexes();
-
 
         composer.run(cas);
         cas.getViewName();

@@ -144,5 +144,42 @@
                 </featureDescription>
             </features>
         </typeDescription>
+        <typeDescription>  
+            <name>org.texttechnologylab.annotation.Transcription</name> 
+            <description/>
+            <supertypeName>uima.tcas.Annotation</supertypeName>
+            <features>
+                <featureDescription>       
+                    <name>startTime</name>    
+                    <description/>   
+                    <rangeTypeName>uima.cas.Float</rangeTypeName>     
+                </featureDescription>
+                <featureDescription>  
+                    <name>endTime</name>       
+                    <description/>       
+                    <rangeTypeName>uima.cas.Float</rangeTypeName>    
+                </featureDescription>  
+                <featureDescription>     
+                    <name>speaker</name>      
+                    <description/>    
+                    <rangeTypeName>uima.cas.String</rangeTypeName>  
+                </featureDescription>  
+                <featureDescription>     
+                    <name>utterance</name>    
+                    <description/>
+                    <rangeTypeName>uima.cas.String</rangeTypeName>  
+                </featureDescription> 
+                <featureDescription>
+                    <name>model</name>      
+                    <description/>    
+                    <rangeTypeName>uima.cas.String</rangeTypeName>  
+                </featureDescription>
+                <featureDescription>
+                    <name>reference</name>    
+                    <description/>  
+                    <rangeTypeName>org.texttechnologylab.annotation.AudioWav</rangeTypeName>
+                </featureDescription>
+            </features>
+        </typeDescription>
     </types>
 </typeSystemDescription>

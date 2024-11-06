@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from pydantic_settings import BaseSettings
 
 import os
-
+from functools import lru_cache
 
 from util import get_words_speaker_mapping, get_sentences_speaker_mapping, get_realigned_ws_mapping_with_punctuation
 import re
@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     model_cache_size: int
 
     class Config:
-        env_prefix = 'duui_transcription_diaper_'
+        env_prefix = 'duui_audio_alignment_'
 
 settings = Settings()
 
@@ -40,13 +40,16 @@ logger.info("Version: %s", settings.annotator_version)
 
 
 UIMA_TYPE_RTTM = "org.texttechnologylab.core.annotation.RTTM"
+UIMA_TYPE_TRANSCRIPTION = "org.texttechnologylab.core.annotation.Transcription"
+
 
 DUUI_OUTPUT_TYPES = {
-    UIMA_TYPE_RTTM
+    UIMA_TYPE_TRANSCRIPTION
 }
 
 DUUI_INPUT_TYPES = {
-    "org.texttechnologylab.core.annotation.AudioWav"
+    UIMA_TYPE_TRANSCRIPTION,
+    UIMA_TYPE_RTTM
 }
 
 SUPPORTED_LANGS = {
@@ -70,16 +73,13 @@ class DocumentModification(BaseModel):
     timestamp: int
     comment: str
 
-class AudioWav(BaseModel):
-    begin: int
-    end: int
-    text: str
-    base64: str
-    channels: int
-    frequence: int
-    bitsPerSample: int
-    id: int
-
+class Transcription(BaseModel):
+    startTime: float
+    endTime: float
+    speaker: str
+    utterance: str
+    model: str
+    audio_wav_id: int
 
 class RTTM(BaseModel):
     segmentType: str
@@ -95,14 +95,18 @@ class RTTM(BaseModel):
     audio_wav_id: int
 
 
+class Align(BaseModel):
+    rttms: List[RTTM]
+    transcriptions: List[Transcription]
+
 class DUUIRequest(BaseModel):
-    audios: List[AudioWav]
-    len: int
+    align: List[Align]
     lang: str
+    use_punct: bool
 
 
 class DUUIResponse(BaseModel):
-    rttms: List[RTTM]
+    transcriptions: List[Transcription]
     modification_meta: Optional[List[DocumentModification]]
 
 
@@ -147,16 +151,14 @@ with open(lua_communication_script_filename, 'rb') as f:
     logger.debug(lua_communication_script_filename)
 
 
-def read_file(path_to_file):
-    with open(path_to_file) as f:
-        contents = f.read().splitlines()
-    return contents
+lru_cache_with_size = lru_cache(maxsize=3)
 
-def find_rttm_file(dir):
-    for subdir, dirs, files in os.walk(dir):
-        for file in files:
-            if file.endswith(".rttm"):
-                return subdir, file
+MODEL = "kredor/punctuate-all"
+
+@lru_cache_with_size
+def load_model():
+    punct_model = PunctuationModel(model=MODEL)
+    return punct_model
 
 app = FastAPI(
     title=settings.annotator_name,
@@ -223,102 +225,91 @@ def get_input_output() -> DUUIInputOutput:
 @app.post("/v1/process")
 def post_process(request: DUUIRequest) -> DUUIResponse:
     modification_timestamp_seconds = int(time())
-    rttms = []
+    transcriptions = []
     modification_meta = []
 
     try:
-
-        AUDIO_NAME = "audio"
-        AUDIO_FILENAME = AUDIO_NAME + ".wav"
-
-        for audio in request.audios:
-            
-            with open(os.path.join(data_dir,'transcript.json'),'r') as fp:
-                file = json.load(fp)
+        for align in request.align:
 
             word_timestamps = []
+
+            for transcription in align.transcriptions:
+                word_timestamps.append({
+                    "start": transcription.startTime,
+                    "end": transcription.endTime,
+                    "text": transcription.utterance
+                })
             # [{'text': 'Und', 'start': 4.14, 'end': 5.68, 'confidence': 0.036}, {'text': 'zwar', 'start': 15.73, 'end': 18.03, 'confidence': 0.623}, {'text': 'werde
-            # We can also select text here
-            for segment in file['segments']:
-                word_timestamps.extend(segment['words'])
-
             speaker_ts = []
-            with open(os.path.join(data_dir, "pred_rttms", "test.rttm"), "r") as f:
-                lines = f.readlines()
-                for line in lines:
-                    line_list = line.split(" ")
-                    s = int(float(line_list[5]) * 1000)
-                    e = s + int(float(line_list[8]) * 1000)
-                    speaker_ts.append([s, e, int(line_list[11].split("_")[-1])])
-
-            wsm = get_words_speaker_mapping(word_timestamps, speaker_ts, "start")
 
 
-            ######
+            for rttm in align.rttms:
+                s = int(float(rttm.turnOnset) * 1000)
+                e = s + int(float(rttm.turnDuration) * 1000)
+                speaker_ts.append([s, e, rttm.speakerName])
 
 
-            punct_model = PunctuationModel(model="kredor/punctuate-all")
+            if request.use_punct:
 
-            words_list = list(map(lambda x: x["word"], wsm))
+                words_list = list(map(lambda x: x["text"], word_timestamps))
+                punct_model = load_model()
+                labled_words = punct_model.predict(words_list)
 
-            labled_words = punct_model.predict(words_list)
+                ending_puncts = ".?!"
+                model_puncts = ".,;:!?"
 
-            ending_puncts = ".?!"
-            model_puncts = ".,;:!?"
+                # We don't want to punctuate U.S.A. with a period. Right?
+                is_acronym = lambda x: re.fullmatch(r"\b(?:[a-zA-Z]\.){2,}", x)
+                for word_dict, labeled_tuple in zip(wsm, labled_words):
+                    word = word_dict["word"]
+                    if (word and labeled_tuple[1] in ending_puncts and (word[-1] not in model_puncts or is_acronym(word))):
+                        word += labeled_tuple[1]
+                        if word.endswith(".."):
+                            word = word.rstrip(".")
+                        word_dict["word"] = word
 
-            # We don't want to punctuate U.S.A. with a period. Right?
-            is_acronym = lambda x: re.fullmatch(r"\b(?:[a-zA-Z]\.){2,}", x)
-            for word_dict, labeled_tuple in zip(wsm, labled_words):
-                word = word_dict["word"]
-                if (word and labeled_tuple[1] in ending_puncts and (word[-1] not in model_puncts or is_acronym(word))):
-                    word += labeled_tuple[1]
-                    if word.endswith(".."):
-                        word = word.rstrip(".")
-                    word_dict["word"] = word
+                wsm = get_realigned_ws_mapping_with_punctuation(wsm)
+                ssm = get_sentences_speaker_mapping(wsm, speaker_ts)
+                for entry in ssm:
+                    transcriptions.append(Transcription(
+                        startTime=entry["start_time"],
+                        endTime=entry["end_time"],
+                        speaker=entry["speaker"],
+                        utterance=entry["text"],
+                        model=f"alignment-punct-{MODEL}",
+                        audio_wav_id=align.rttms[0].audio_wav_id
+                    ))
 
-            wsm = get_realigned_ws_mapping_with_punctuation(wsm)
-            ssm = get_sentences_speaker_mapping(wsm, speaker_ts)
-
-
-
-            for line in pred_rttm:
-                elements = line.replace("   ", " ").split(" ")
-                if len(elements) < 10:
-                    print(f"Error parsing line: {line}")
-                    continue
-                rttms.append(RTTM(
-                    segmentType=elements[0],
-                    #file=elements[1],
-                    channel=int(elements[2]),
-                    turnOnset=float(elements[3]),
-                    turnDuration=float(elements[4]),
-                    orthographyField=elements[5],
-                    speakerType=elements[6],
-                    speakerName=elements[7],
-                    confidenceScore=float(elements[8]) if "NA" not in elements[8] else -1,
-                    signalLookaheadTime=float(elements[9]) if "NA" not in elements[9] else -1,
-                    model=model_name,
-                    audio_wav_id=audio.id
-                ))
+            else:
+                wsm = get_words_speaker_mapping(word_timestamps, speaker_ts, "start")
+                for entry in wsm:
+                    transcriptions.append(Transcription(
+                        startTime=entry["start_time"],
+                        endTime=entry["end_time"],
+                        speaker=entry["speaker"],
+                        utterance=entry["word"],
+                        model="alignment",
+                        audio_wav_id=align.rttms[0].audio_wav_id
+                    ))
 
         
             modification_meta.append(DocumentModification(
                 user=settings.annotator_name,
                 timestamp=modification_timestamp_seconds,
-                comment=f"{settings.annotator_name} ({settings.annotator_version}), DiaPer (08-02-2024)"
+                comment=f"{settings.annotator_name} ({settings.annotator_version}), DUUI-Alignment"
             ))
 
     except Exception as ex:
         logger.exception(ex)
 
-    logger.debug(rttms)
+    logger.debug(transcriptions)
     logger.debug(modification_meta)
 
     duration = int(time()) - modification_timestamp_seconds
     logger.info("Processed in %d seconds", duration)
 
     return DUUIResponse(
-        rttms=rttms,
+        transcriptions=transcriptions,
         modification_meta=modification_meta,
     )
 

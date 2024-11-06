@@ -1,11 +1,11 @@
-[![Version](https://img.shields.io/static/v1?label=duui-transcription-diaper&message=0.1.2&color=blue)](https://docker.texttechnologylab.org/v2/duui-transcription-diaper/tags/list)
+[![Version](https://img.shields.io/static/v1?label=duui-audio-alignment&message=0.1.2&color=blue)](https://docker.texttechnologylab.org/v2/duui-audio-alignment/tags/list)
 [![Version](https://img.shields.io/static/v1?label=Python&message=3.8&color=green)]()
 [![Version](https://img.shields.io/static/v1?label=Transformers&message=4.21.1&color=yellow)]()
 [![Version](https://img.shields.io/static/v1?label=Torch&message=1.11.0&color=red)]()
 
-# Transcription DiaPer
+# Audio Alignment
 
-DUUI implementation of [DiaPer](https://github.com/BUTSpeechFIT/DiaPer)
+DUUI Audio Alignment methods.
 
 ## Included Models
 
@@ -18,21 +18,21 @@ DUUI implementation of [DiaPer](https://github.com/BUTSpeechFIT/DiaPer)
 
 # How To Use
 
-For using duui-transcription-diaper as a DUUI image it is necessary to use the [Docker Unified UIMA Interface (DUUI)](https://github.com/texttechnologylab/DockerUnifiedUIMAInterface).
+For using duui-audio-alignment as a DUUI image it is necessary to use the [Docker Unified UIMA Interface (DUUI)](https://github.com/texttechnologylab/DockerUnifiedUIMAInterface).
 
 ## Start Docker container
 
 ```
-docker run --rm -p 1000:9714 docker.texttechnologylab.org/duui-transcription-diaper:latest
+docker run --rm -p 1000:9714 docker.texttechnologylab.org/duui-audio-alignment:latest
 ```
 
-Find all available image tags here: https://docker.texttechnologylab.org/v2/textimager-duui-transcription-diaper/tags/list
+Find all available image tags here: https://docker.texttechnologylab.org/v2/textimager-duui-audio-alignment/tags/list
 
 ## Run within DUUI
 
 ```
 composer.add(
-    new DUUIDockerDriver.Component("docker.texttechnologylab.org/textimager-duui-transcription-diaper:latest")
+    new DUUIDockerDriver.Component("docker.texttechnologylab.org/textimager-duui-audio-alignment:latest")
         .withScale(iWorkers)
         .withImageFetching()
 );
@@ -84,7 +84,7 @@ Alexander Leonhardt, Giuseppe Abrami, Daniel Baumartz and Alexander Mehler. (202
   author         = {Schrottenbacher, Patrick},
   title          = {DiaPer model as DUUI component},
   year           = {2024},
-  howpublished   = {https://github.com/texttechnologylab/duui-uima/tree/main/duui-transcription-diaper}
+  howpublished   = {https://github.com/texttechnologylab/duui-uima/tree/main/duui-audio-alignment}
 }
 
 ```
