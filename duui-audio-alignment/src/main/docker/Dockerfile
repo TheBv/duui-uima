@@ -22,6 +22,8 @@ ENV DUUI_AUDIO_ALIGNMENT_MODEL_CACHE_SIZE=$DUUI_AUDIO_ALIGNMENT_MODEL_CACHE_SIZE
 ARG DUUI_AUDIO_ALIGNMENT_VARIANT=3
 ENV DUUI_AUDIO_ALIGNMENT_VARIANT=$DUUI_AUDIO_ALIGNMENT_VARIANT
 
+# Prefetch the punctation model
+RUN "/usr/local/bin/_entrypoint.sh" python -c "from deepmultilingualpunctuation import PunctuationModel; PunctuationModel('kredor/punctuate-all')"
 
 COPY ./src/main/resources/TypeSystem.xml ./TypeSystem.xml
 COPY ./src/main/python/duui.py ./duui.py

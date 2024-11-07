@@ -10,7 +10,7 @@ function serialize(inputCas, outputStream, parameters)
     local doc_lang = inputCas:getDocumentLanguage()
 
     local use_punct = parameters["use_punct"] or false
-
+    local words = parameters["words"] or false
     local align = {}
     local align_count = 1
 
@@ -32,7 +32,8 @@ function serialize(inputCas, outputStream, parameters)
     outputStream:write(json.encode({
         align = align,
         lang = doc_lang,
-        use_punct = use_punct
+        use_punct = use_punct,
+        words = words
     }))
 end
 

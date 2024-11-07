@@ -6,6 +6,7 @@ import org.apache.uima.UIMAException;
 import org.apache.uima.fit.factory.JCasFactory;
 import org.apache.uima.fit.util.JCasUtil;
 import org.apache.uima.jcas.JCas;
+import org.apache.uima.util.CasCopier;
 import org.apache.uima.util.XmlCasSerializer;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -108,11 +109,27 @@ public class DUUISentencizerNemoTest {
         composer.add(
             // DIAPER
                 new DUUIRemoteDriver
-                        .Component("http://127.0.0.1:1002")
+                        .Component("http://127.0.0.1:1001")
                         .withScale(1)
         );
-        composer.add(
+
+        var align1 = new DUUIComposer()
+                .withSkipVerification(true)
+                .withLuaContext(new DUUILuaContext().withJsonLibrary());
+        align1.addDriver(new DUUIRemoteDriver());
+        align1.add(
             // Alignment
+                new DUUIRemoteDriver
+                        .Component("http://127.0.0.1:1003")
+                        .withScale(1)
+        );
+
+        var align2 = new DUUIComposer()
+                .withSkipVerification(true)
+                .withLuaContext(new DUUILuaContext().withJsonLibrary());
+        align2.addDriver(new DUUIRemoteDriver());
+        align2.add(
+                // Alignment
                 new DUUIRemoteDriver
                         .Component("http://127.0.0.1:1003")
                         .withScale(1)
@@ -126,7 +143,7 @@ public class DUUISentencizerNemoTest {
         cas.setDocumentText("Example text");
 
 
-        String base64 = Base64.getEncoder().encodeToString(FileUtils.readFileToByteArray(new File("src/test/resources/IS1009a.wav")));
+        String base64 = Base64.getEncoder().encodeToString(FileUtils.readFileToByteArray(new File("src/test/resources/IS1009a_short.wav")));
         
 
 
@@ -142,6 +159,12 @@ public class DUUISentencizerNemoTest {
         audioWave.addToIndexes();
 
         composer.run(cas);
+        var align_default = JCasFactory.createJCas();
+        var align_punct = JCasFactory.createJCas();
+        CasCopier.copyCas(cas.getCas(), align_default.getCas(), true);
+        CasCopier.copyCas(cas.getCas(), align_punct.getCas(), true);
+        align1.run(align_default);
+        align2.run(align_punct);
         cas.getViewName();
         JCasUtil.select(cas, DocumentModification.class).forEach(System.out::println);
     }

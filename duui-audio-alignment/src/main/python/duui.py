@@ -103,6 +103,7 @@ class DUUIRequest(BaseModel):
     align: List[Align]
     lang: str
     use_punct: bool
+    words: bool
 
 
 class DUUIResponse(BaseModel):
@@ -248,11 +249,13 @@ def post_process(request: DUUIRequest) -> DUUIResponse:
                 e = s + int(float(rttm.turnDuration) * 1000)
                 speaker_ts.append([s, e, rttm.speakerName])
 
-
+            wsm = get_words_speaker_mapping(word_timestamps, speaker_ts, "start")
+            model="alignment"
             if request.use_punct:
 
-                words_list = list(map(lambda x: x["text"], word_timestamps))
+                words_list = list(map(lambda x: x["word"], wsm))
                 punct_model = load_model()
+                model=f"alignment-punct-{MODEL}"
                 labled_words = punct_model.predict(words_list)
 
                 ending_puncts = ".?!"
@@ -269,28 +272,30 @@ def post_process(request: DUUIRequest) -> DUUIResponse:
                         word_dict["word"] = word
 
                 wsm = get_realigned_ws_mapping_with_punctuation(wsm)
-                ssm = get_sentences_speaker_mapping(wsm, speaker_ts)
-                for entry in ssm:
+
+            if request.words:
+                for entry in wsm:
                     transcriptions.append(Transcription(
-                        startTime=entry["start_time"],
-                        endTime=entry["end_time"],
+                        startTime=entry["start_time"]/1000,
+                        endTime=entry["end_time"]/1000,
                         speaker=entry["speaker"],
-                        utterance=entry["text"],
-                        model=f"alignment-punct-{MODEL}",
+                        utterance=entry["word"],
+                        model=model,
                         audio_wav_id=align.rttms[0].audio_wav_id
                     ))
 
             else:
-                wsm = get_words_speaker_mapping(word_timestamps, speaker_ts, "start")
-                for entry in wsm:
+                ssm = get_sentences_speaker_mapping(wsm, speaker_ts)
+                for entry in ssm:
                     transcriptions.append(Transcription(
-                        startTime=entry["start_time"],
-                        endTime=entry["end_time"],
+                        startTime=entry["start_time"]/1000,
+                        endTime=entry["end_time"]/1000,
                         speaker=entry["speaker"],
-                        utterance=entry["word"],
-                        model="alignment",
+                        utterance=entry["text"],
+                        model=model,
                         audio_wav_id=align.rttms[0].audio_wav_id
                     ))
+
 
         
             modification_meta.append(DocumentModification(
